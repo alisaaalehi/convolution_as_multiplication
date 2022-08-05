@@ -1,0 +1,18 @@
+\BOOKMARK [1][-]{section.1}{What is the purpose?}{}% 1
+\BOOKMARK [1][-]{section.2}{Why do we do that?}{}% 2
+\BOOKMARK [1][-]{section.3}{What is in this document?}{}% 3
+\BOOKMARK [1][-]{section.4}{What is a Toeplitz matrix?}{}% 4
+\BOOKMARK [1][-]{section.5}{One more definition: Doubly Blocked Toeplitz mtrix}{}% 5
+\BOOKMARK [1][-]{section.6}{Is this Convolution or Cross Correlation?}{}% 6
+\BOOKMARK [1][-]{section.7}{Step by Step}{}% 7
+\BOOKMARK [2][-]{subsection.7.1}{Input and Filter}{section.7}% 8
+\BOOKMARK [2][-]{subsection.7.2}{Calculate the final output size}{section.7}% 9
+\BOOKMARK [2][-]{subsection.7.3}{Zero-pad the filter matrix}{section.7}% 10
+\BOOKMARK [2][-]{subsection.7.4}{Toeplitz matrix for each row of the zero-padded filter}{section.7}% 11
+\BOOKMARK [2][-]{subsection.7.5}{Create doubly blocked toeplitz matrix}{section.7}% 12
+\BOOKMARK [2][-]{subsection.7.6}{Convert the input matrix to a vector}{section.7}% 13
+\BOOKMARK [2][-]{subsection.7.7}{Multiply doubly blocked toeplitz matrix with vectorized input signal}{section.7}% 14
+\BOOKMARK [2][-]{subsection.7.8}{Last step: reshape the result to a matrix form}{section.7}% 15
+\BOOKMARK [1][-]{section.8}{Compare the result with other convolution methods}{}% 16
+\BOOKMARK [1][-]{section.9}{To Do}{}% 17
+\BOOKMARK [1][-]{section.10}{References}{}% 18

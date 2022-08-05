@@ -1,0 +1,658 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[table]{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsfonts, amsmath, amssymb}
+\usepackage[none]{hyphenat}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage[Q=yes]{examplep}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+\usepackage{tikz-qtree}
+\usepackage{float}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multicol} % multi columns
+
+\usepackage{breakcites} % break long citations
+\hypersetup{
+	colorlinks=false,
+	linkcolor=blue,
+	filecolor=magenta,      
+	urlcolor=cyan,
+}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyfoot{}
+\fancyhead[L]{\slshape \MakeUppercase  Convolution as Matrix Multiplication}
+
+\fancyhead[R]{\slshape Ali Salehi}
+\fancyfoot[c]{\thepage}
+
+%\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+% beign python code --------------------------------------------V
+% Default fixed font does not support bold face
+\DeclareFixedFont{\ttb}{T1}{txtt}{bx}{n}{12} % for bold
+\DeclareFixedFont{\ttm}{T1}{txtt}{m}{n}{12}  % for normal
+
+% Custom colors
+\usepackage{color}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+
+\usepackage{listings}
+
+% Python style for highlighting
+\newcommand\pythonstyle{\lstset{
+		language=Python,
+		basicstyle=\ttm,
+		otherkeywords={np.array, np.pad, np.zeros, np.r_, np.matmul, shape},             % Add keywords here
+		keywordstyle=\ttb\color{deepblue},
+		emph={MyClass,__init__, import, as, toeplitz,},          % Custom highlighting
+		emphstyle=\ttb\color{deepred},    % Custom highlighting style
+		stringstyle=\color{deepgreen},
+		frame=shadowbox,  
+		numbersep=0pt,
+		resetmargins=true,
+		showstringspaces=true            % 
+}}
+
+
+% Python environment
+\lstnewenvironment{python}[1][]
+{
+	\pythonstyle
+	\lstset{#1}
+}
+{}
+
+% Python for external files
+\newcommand\pythonexternal[2][]{{
+		\pythonstyle
+		\lstinputlisting[#1]{#2}}}
+
+% Python for inline
+\newcommand\pythoninline[1]{{\pythonstyle\lstinline!#1!}}
+% end python code ------------------------------------------------^
+
+\usepackage{amsmath}
+\newcommand\x{\cellcolor{red!10}}
+\newcommand\y{\cellcolor{green!10}}
+\newcommand\z{\cellcolor{blue!10}}
+
+\begin{document}
+	\begin{titlepage}
+		\begin{center}
+			\vspace*{1cm}
+			\large {\textbf{Tutorial}} \\
+			\vfill
+			\line(1,0){400} \\ [3mm]
+			\MakeUppercase {\large \textbf 2D Convolution as Matrix Multiplication using Toeplitz Matrices}
+			\line(1,0){400} \\
+			\vfill
+			
+			By: Ali Salehi \\
+			\small AliSaaalehi@gmail.com \\
+			\today
+		\end{center}
+	\end{titlepage}
+	
+	\tableofcontents
+	\thispagestyle{empty}
+	\clearpage
+	%\setcounter{page}[1]
+	
+	
+	\section{What is the purpose?}
+	Instead of using for-loops to perform 2D convolution on images (or any other 2D matrices) we can convert the filter to a Toeplitz matrix and image to a vector and do the convolution just by one matrix multiplication (and of course some post-processing on the result of this multiplication to get the final result)
+	
+	
+	\section{Why do we do that?}
+	There are many efficient matrix multiplication algorithms, so using them we can have an efficient implementation of convolution operation.
+	
+	\section{What is in this document?}
+	Mathematical and algorithmic explanation of this process. I will put a naive Python implementation of this algorithm to make it more clear.\\
+	Let's start with some definition and basic operation:
+	
+	\section{What is a Toeplitz matrix?}
+	Toeplitz matrix is a matrix in which each values along the main diagonal and sub diagonals are constant. Matrix $G$ is an example:
+	
+	\begin{equation}
+	\begin{pmatrix}
+	2 & -1 & 0 & \cdots & \cdots & \cdots & \cdots & 1\\
+	5 & 2 & -1 & 0 & & & & \vdots\\
+	-8 & 5 & 2 & -1 & \ddots & & & \vdots\\
+	\vdots & -8 & \ddots & \ddots & \ddots & \ddots & & \vdots\\
+	\vdots & & \ddots & \ddots & \ddots & \ddots & 0 & \vdots\\
+	\vdots & & & \ddots & 5 & 2 & -1 & 0\\
+	\vdots & & & & -8 & 5 & 2 & -1\\
+	1 & \cdots & \cdots  & \cdots & \cdots & -8 & 5 & 2\\
+	\end{pmatrix}
+	\end{equation}
+	\vspace{10mm}
+	
+	In a $N \times N$ matrix, its elements are determined by a ($2N -1$) length sequence
+	 $$\{t_n | -(N-1) \le n \le (N-1)\}$$.
+	 So given a sequence $t_n$ we can create a Toeplitz matrix by following these steps:   
+	
+	\begin{itemize}
+		\item  put the sequence in the first column of the matrix.
+		\item  shift it and put it in the next column. When shifting, the last element disappears and a new element of the sequence appears. If there is no such an element, put zero in that location.
+	\end{itemize} 
+	
+	
+	specifically:
+	
+	\large $$ T(m,n)=t_{m-n} $$
+	
+	\begin{equation}
+	\begin{pmatrix}
+	t_0 & t_{-1} & t_{-2} & \cdots & \cdots & \cdots & \cdots & t_{-(N-1)}\\
+	t_1 & t_0 & t_{-1} & t_{-2} & & & & \vdots\\
+	t_2 & t_1 & t_0 & t_{-1} & \ddots & & & \vdots\\
+	\vdots & t_2 & \ddots & \ddots & \ddots & \ddots & & \vdots\\
+	\vdots & & \ddots & \ddots & \ddots & \ddots & t_{-2} & \vdots\\
+	\vdots & & & \ddots & t_1 & t_0 & t_{-1} & t_{-2}\\
+	\vdots & & & & t_2 & t_1 & t_0 & t_{-1}\\
+	t_{(N-1)} & \cdots & \cdots  & \cdots & \cdots & t_2 & t_1 & t_0\\
+	\end{pmatrix}
+	\end{equation}
+	\vspace{10mm}
+	
+	Be aware that when we are working with sequences that are defined just for $n \ge 0$ values for $t_n$ when $n \le 0$ should be considered as $0$. For example $4 \times 4$ Toeplitz matrix for the sequence $f[n]=[1,2,3]$ will be:
+	
+	\begin{equation}
+	\begin{pmatrix}
+	
+	1 & 0 & 0 & 0\\
+	2 & 1 & 0 & 0\\
+	3 & 2 & 1 & 0\\
+	0 & 3 & 2 & 1 \\
+	
+	\end{pmatrix}
+	\end{equation}
+	
+	\section{One more definition: Doubly Blocked Toeplitz mtrix} \label{doubly_blocked}
+	In the matrix $A$, all $A_{ij}$ are matrices. If the structure of $A$, with respects to its sub-matrices is Toeplitz, then matrix $A$ is called \textbf{Block-Toeplitz}. 
+	
+	\begin{equation}
+	\begin{pmatrix}
+	A_{11} & A_{12} & \cdots & A_{1N}\\
+	A_{21} & A_{22} & \cdots & A_{2N}\\
+	\vdots & \vdots & \vdots & \vdots \\
+	A_{M1} & A_{M2} & \cdots & A_{MN}\\
+	
+	\end{pmatrix}
+	\end{equation}
+	
+	If each individual $A{ij}$ also is a Toeplitz matrix then $A$ is called \textbf{Doubly Blocked Toeplitz}
+	
+	
+	\section{Is this Convolution or Cross Correlation?}
+	Most of the time, the word \textit{convolution} in the deep learning literature is used instead of cross-correlation, but here I am explaining the process for convolution as is known in the signal processing community. Simply, for convolution we need to flip the filter (kernel) in both vertical and horizontal directions, but for cross-correlation we don't. 
+	
+	The method explained here performs the convolution (not correlation). Because of the way it is implemented here, there is no need to flip the filter, but if you are doing an example by hand and want to compare the results with the implemented method, remember to consider the flipping step in your calculation.
+	
+	
+	
+	\section{Step by Step}
+	Let's explain the algorithm step by step using an example. Codes are written in python and the numpy library is used all over the code.\\
+	
+	\textbf{Note:} Remember that convolution is a commutative operation, so it does not change the output if we switch the inputs for this operation. For simplicity, I will be calling one of the inputs \textbf{input or I} and the other \textbf{filter or F}
+	
+	\subsection{Input and Filter}
+	Input matrix that the filter will be convolved with it is:
+	\begin{equation}
+	I = 
+	\begin{bmatrix}
+	1 & 2 & 3 \\
+	4 & 5 & 6 \\
+	\end{bmatrix}
+	\end{equation}
+	
+	And let the filter be:
+	\begin{equation}
+	F = 
+	\begin{bmatrix}
+	10 & 20 \\
+	30 & 40 \\
+	\end{bmatrix}
+	\end{equation}
+	
+	Python code to define these two matrices is:
+	\vspace{10mm}
+	\begin{python}
+		import numpy as np
+		
+		# input signal
+		I = np.array([[1, 2, 3], [4, 5, 6]])
+		
+		# filter 
+		F = np.array([[10, 20], [30, 40]])           
+	\end{python}
+	\vspace{10mm}
+	
+	\subsection{Calculate the final output size} \label{output_size}
+	If the input signal is $m_1 \times n_1$ and filter is $m_2 \times n_2$ the size of the convolution will be 
+	$$
+	(m_1 + m_2 -1) \times (n_1 + n_2 -1)
+	$$
+	This is the size of full discrete linear convolution. One might just use some part of the output based on the application. For example in deep learning literature you can use "valid" or "same" as your padding mode. In these case just parts of the full output is used.\\
+	Proper zero padding should be done to get the correct output. Zero padding is the next step.   
+	
+	\vspace{10mm}
+	\begin{python}
+		# number columns and rows of the input 
+		I_row_num, I_col_num = I.shape 
+		
+		# number of columns and rows of the filter
+		F_row_num, F_col_num = F.shape
+		
+		
+		#  calculate the output dimensions
+		output_row_num = I_row_num + F_row_num - 1
+		output_col_num = I_col_num + F_col_num - 1         
+	\end{python}
+	\vspace{10mm}
+	
+	\subsection{Zero-pad the filter matrix}
+	The next step is to zero pad the filter to make it the same size as the output. Zeros should be added to the top and right sides of the filter.
+	
+		\begin{equation}
+		ZeroPadded \ F=
+		\begin{bmatrix}
+		 0 &  0 &  0 &  0\\
+		\x 10 & \x 20 &  0 &  0\\
+		\x 30 & \x 40 &  0 &  0\\
+		\end{bmatrix}
+		\end{equation}
+	
+	\vspace{10mm}
+	\begin{python}
+ # zero pad the filter
+ F_zero_padded = np.pad(F, ((output_row_num - F_row_num, 0),
+                           (0, output_col_num - F_col_num)),
+                        'constant', constant_values=0)
+
+ '''                       
+ F_zero_padded:
+ [[ 0  0  0  0]
+ [10 20  0  0]
+ [30 40  0  0]]
+ '''
+ 
+	\end{python}
+	\vspace{10mm}
+	
+	\subsection{Toeplitz matrix for each row of the zero-padded filter}
+	For each row of the zero-padded filter (\pythoninline{F_zero_padded}) create a Toeplitz matrix and store them in a list. Matrix created using the last row goes to the first cell of this list.\\
+	
+	\begin{equation}
+	ZeroPadded \ F=
+	\begin{bmatrix}
+	\x 0 & \x 0 & \x 0 & \x 0\\
+	\y 10 & \y 20 & \y 0 & \y 0\\
+	\z 30 & \z 40 & \z 0 & \z 0\\
+	\end{bmatrix}
+	\end{equation}
+	
+	\begin{equation}
+	F_0=
+	\begin{bmatrix}
+	\z 30 & \z 0 & \z 0 \\
+	\z 40 & \z 30 & \z 0 \\
+	\z 0 & \z 40 & \z 30 \\
+	\z 0 & \z 0 & \z 40  \\
+	\end{bmatrix}
+	F_1=
+	\begin{bmatrix}
+	\y 10 & \y 0 & \y 0 \\
+	\y 20 & \y 10 & \y 0 \\
+	\y 0 & \y 20 & \y 10 \\
+	\y 0 & \y 0 & \y 20  \\
+	\end{bmatrix}   
+	F_2=
+	\begin{bmatrix}
+	\x 0 & \x 0 & \x 0 \\
+	\x 0 & \x 0 & \x 0 \\
+	\x 0 & \x 0 & \x 0 \\
+	\x 0 & \x 0 & \x 0 \\
+	\end{bmatrix}
+	\end{equation}
+	\vspace{10mm}
+	
+	\textbf{Why these matrices have three columns? Why not two or 5? What is the rule here?} \\
+	The important point is that the number of columns of these generated Toeplitz matrices should be same as the number of columns of the input (I) matrix.\\
+	In the code, I am using \textit{toeplitz()} function from \textit{scipy.linalg library}. One row of the $F$ is passed to this function and the function puts it as the first column of the its output matrix. Then as it is explained before, this vector should be shifted down and be putted in the second column. For this function, in addition to the first column, we need to define the first row, otherwise, the output of the function would be different than what we expect here. The first element of this first row is same as the first element of the first column, and the rest of the elements should be set to zero.
+	
+	\vspace{10mm}
+	\begin{python}
+	toeplitz_list = []
+	# iterate from last row to the first row
+	for i in range(F_zero_padded.shape[0]-1, -1, -1):
+	 c = F_zero_padded[i, :] # copy i'th row of the F to c
+	 r = np.r_[c[0], np.zeros(I_col_num-1)]
+	 
+	 # toeplitz function is in scipy.linalg library
+	 toeplitz_m = toeplitz(c,r) 
+	 toeplitz_list.append(toeplitz_m)
+	 print('F '+ str(i)+'\n', toeplitz_m)
+	\end{python}
+	\vspace{10mm}
+	
+	\subsection{Create doubly blocked toeplitz matrix}
+	Now all these small toeplitz matrices should be arranged in a big doubly blocked toepltiz matrix \ref{doubly_blocked}.\\
+	In this example $F_0, F_1, F_2$ are corresponding toeplitz matrices for each row of the filter. They should be filled in the doubly blocked toeplitz matrix in this way:
+	
+	\begin{equation}
+	doubly \ blocked = 
+	\begin{bmatrix}
+	F_0 & 0 \\
+	F_1 & F_0 \\
+	F_2 & F_1 \\
+	\end{bmatrix}
+	\end{equation}
+	Number of columns in this symbolic matrix should be same as the number of rows in the input signal I.\\
+	The following code stores the indexes of $F_0, F_1, F_2$ in this format. This will be used to fill out the doubly blocked toepltiz matrix later.
+	
+	\vspace{10mm}
+	\begin{python}
+	c = range(1, F_zero_padded.shape[0]+1)
+	r = np.r_[c[0], np.zeros(I_row_num-1, dtype=int)]
+	
+	doubly_indices = toeplitz(c, r)
+	print('doubly indices \n', doubly_indices)
+	
+	'''
+	doubly indices 
+	[[1 0]
+	[2 1]
+	[3 2]]
+	'''
+	\end{python}
+
+	Now let's fill in the doubly blocked toepltiz matrix. Following code does this part:
+	
+	\vspace{10mm}
+	\begin{python} 
+	# shape of one of those small toeplitz matrices
+	h = toeplitz_shape[0]*doubly_indices.shape[0]
+	w = toeplitz_shape[1]*doubly_indices.shape[1]
+	doubly_blocked_shape = [h, w]
+	doubly_blocked = np.zeros(doubly_blocked_shape)
+	
+	# tile the toeplitz matrix 
+	b_h, b_w = toeplitz_shape # hight & withs of each block
+	for i in range(doubly_indices.shape[0]):
+	 for j in range(doubly_indices.shape[1]):
+	  start_i = i * b_h
+	  start_j = j * b_w
+	  end_i = start_i + b_h
+	  end_j = start_j + b_w
+	  doubly_blocked[start_i: end_i, start_j:end_j] =
+	                     toeplitz_list[doubly_indices[i,j]-1]
+	
+	print(doubly_blocked)
+	'''
+	[30.  0.  0.  0.  0.  0.]
+	[40. 30.  0.  0.  0.  0.]
+	[ 0. 40. 30.  0.  0.  0.]
+	[ 0.  0. 40.  0.  0.  0.]
+	[10.  0.  0. 30.  0.  0.]
+	[20. 10.  0. 40. 30.  0.]
+	[ 0. 20. 10.  0. 40. 30.]
+	[ 0.  0. 20.  0.  0. 40.]
+	[ 0.  0.  0. 10.  0.  0.]
+	[ 0.  0.  0. 20. 10.  0.]
+	[ 0.  0.  0.  0. 20. 10.]
+	[ 0.  0.  0.  0.  0. 20.]
+	'''
+	\end{python}
+	\vspace{10mm}
+	For this example the result will be the following matrix. I've colored parts of the matrix that is related to each of the small toeplitz matrices.
+	
+	\begin{equation}
+	doubly \ blocked = 
+	\begin{bmatrix}
+	
+	\z 30 & \z 0 & \z 0 & 0 & 0 & 0 \\
+	\z 40 & \z 30 & \z 0 & 0 & 0 & 0 \\
+	\z 0 & \z 40 & \z 30 & 0 & 0 & 0 \\
+	\z 0 & \z 0 & \z 40  & 0 & 0 & 0 \\
+	
+	\y 10 & \y 0 & \y 0 & \z 30 & \z 0 & \z 0 \\
+	\y 20 & \y 10 & \y 0 & \z 40 & \z 30 & \z 0 \\
+	\y 0 & \y 20 & \y 10 & \z 0 & \z 40 & \z 30 \\
+	\y 0 & \y 0 & \y 20  & \z 0 & \z 0 & \z 40  \\
+	
+	\x 0 & \x 0 & \x 0 &  \y 10 & \y 0 & \y 0 \\
+	\x 0 & \x 0 & \x 0 & \y 20 & \y 10 & \y 0 \\
+	\x 0 & \x 0 & \x 0 & \y 0 & \y 20 & \y 10 \\
+	\x 0 & \x 0 & \x 0 & \y 0 & \y 0 & \y 20 \\
+	
+	\end{bmatrix}
+	\end{equation}
+	
+	\subsection{Convert the input matrix to a vector}
+	Now that the filter has converted to a doubly blocked Toeplitz matrix, we just need to convert the input signal to a vector and multiply them. \\
+	All the rows of the input should be transposed to a column vector and stacked on top of each other. The last row goes first!
+	
+	\begin{equation}
+	I = 
+	\begin{bmatrix}
+	\x 1 & \x 2 & \x 3 \\
+	\z 4 & \z 5 & \z 6 \\
+	\end{bmatrix}
+	\Rightarrow Vectoriaed \  I = 
+	\begin{bmatrix}
+	\z 4 \\ \z 5 \\ \z 6 \\ \x  1 \\ \x  2 \\ \x  3
+	\end{bmatrix}
+	\end{equation}
+	
+	The following function does the vectorization. I am sure that there are much simpler ways to do so, but for the purpose of explanation, this function is implemented in this way.
+	
+	\vspace{10mm}
+	\begin{python}
+		def matrix_to_vector(input):
+	 	 input_h, input_w = input.shape
+		 output_vector = np.zeros(input_h*input_w,
+	   	                          dtype=input.dtype)
+		 # flip the input matrix up down
+		 input = np.flipud(input) 
+	 	 for i,row in enumerate(input):
+		  st = i*input_w
+		  nd = st + input_w
+		  output_vector[st:nd] = row
+		
+		return output_vector
+	\end{python}
+	\vspace{10mm}
+	
+	
+	\subsection{Multiply doubly blocked toeplitz matrix with vectorized input signal}
+	Do the matrix multiplication between these two matrices. In this example, the doubly blocked Toeplitz matrix is $ 12 \times 6$ and the vectorized input is $6 \times 1$ so the result of the multiplication is $12 \times 1$.
+	
+	\vspace{10mm}
+	\begin{python}
+ # get result of the convolution by matrix mupltiplication
+ result_vector = np.matmul(doubly_blocked, vectorized_I)
+ print('result_vector: ', result_vector)
+
+ '''
+ result_vector: [120 310 380 240 70 230 330 240 10 40 70 60]
+ '''
+	\end{python}
+	\vspace{10mm}
+	
+	\subsection{Last step: reshape the result to a matrix form}
+	From section \ref{output_size} we know that the output of the convolution should be $(m_1 + m_2 -1) \times (n_1 + n_2 -1)$. First $(n_1 + n_2 -1)$ elements in the output vector form the last row of the final output and the second $(n_1 + n_2 -1)$ elements go to the second-to-last row of the output matrix. Repeat this process to form the final output matrix.
+	
+	In this example $n_1 = 3$ and $n_2 = 2$, so every 4 element goes to one row of the output matrix.
+	
+	\begin{equation}
+	result \ vector = 
+	\begin{bmatrix}
+	\x 120\\ \x  310\\ \x 380\\ \x 240\\ \y 70\\ \y 230\\ \y 330\\ \y 240\\ \z 10\\ \z 40\\ \z 70\\ \z 60\\
+	\end{bmatrix}
+	\Rightarrow output= 
+	\begin{bmatrix}
+	\z 10 & \z 40 & \z 70 & \z 60\\
+	\y 70 & \y 230 & \y 330 & \y 240\\
+	\x 120 & \x  310 & \x 380 & \x 240\\
+	\end{bmatrix}
+	\end{equation}
+	\vspace{10mm}
+	
+	Following function performs this step:
+	
+	\vspace{10mm}
+	\begin{python}
+	def vector_to_matrix(input, output_shape):
+	 output_h, output_w = output_shape
+	 output = np.zeros(output_shape, dtype=input.dtype)
+	 for i in range(output_h):
+	  st = i*output_w
+	  nd = st + output_w
+	  output[i, :] = input[st:nd]
+	  
+	 # flip the output matrix up-down to get correct result
+	 output=np.flipud(output)
+	 return output
+		
+	\end{python}
+	\vspace{10mm}
+	
+	\section{Compare the result with other convolution methods}
+	We can compare the output of this method with \textit{convolve2d()} function from the \textit{scipy} library.
+	
+	\vspace{10mm}
+	\begin{python}
+	from scipy import signal
+	
+	result = signal.convolve2d(I, F, "full")
+	print('result: \n', result)
+	
+	
+	
+	'''
+	result: 
+	[[ 10  40  70  60]
+	[ 70 230 330 240]
+	[120 310 380 240]]
+	'''
+		
+	\end{python}
+	\vspace{10mm}
+	
+	As you can see the result on the same I and F matrices is same as the result of the implemented method. The parameter "full" is passed to the \textit{signal.convolve2d()} function to get the full convolution results.
+	
+	\section{To Do}
+	
+	\begin{itemize}
+		\item Add notebook to the project
+		\item Rewrite an efficient code
+		\item Extend it to handle multi-channel input and filters
+		\item Make it work with parameters padding='same' or 'valid'
+	\end{itemize}
+	
+	\section{References}
+	The steps explained here are based on Christophoros Nikou's slides on \href{ http://www.cs.uoi.gr/~cnikou/Courses/Digital_Image_Processing/2010-2011/Chapter_04c_Frequency_Filtering_(Circulant_Matrices).ppt}{Filtering in the Frequency Domain (Circulant Matrices and Convolution)}\\ \\
+	This post on \href{https://dsp.stackexchange.com/questions/35373/convolution-as-a-doubly-block-circulant-matrix-operating-on-a-vector/35376#35376}{dsp.stackexchange} also helped in understanding this algorithm.
+	
+
+%\begin{verbatim}   
+%   
+%    @Salvador gave a good answer to this question but I am not sure that it is exactly correct. The final result of convolution in his example should be 4 by 4 and not 2 by 2!
+%    
+%    There is a great explanation on [dsp.stackexchange][1] that I'm going to restate it here in an algorithmic way:
+%    
+%    **Goal**: 2D convolution as a matrix multiplication
+%    
+%    **Input**: 
+%    
+%    
+%    https://stackoverflow.com/questions/16798888/2-d-convolution-as-a-matrix-matrix-multiplication
+%    
+%      [1]: https://dsp.stackexchange.com/questions/35373/convolution-as-a-doubly-block-circulant-matrix-operating-on-a-vector/35376#35376
+%      
+%      https://en.wikipedia.org/wiki/Toeplitz_matrix
+% \end{verbatim}
+      
+%    	\begin{figure}[h!] %[H]
+%    		% width=\linewidth, 
+%    		\begin{center}
+%    			\includegraphics[scale=0.60,]{a.jpg} 
+%    			\caption{Mean squared error of matlab function during training}
+%    			\label{fig:{mlp-matlab}}
+%    		\end{center}
+%    	\end{figure}
+    
+%    \begin{center}
+%    	\begin{tabular}{||c c c c||} 
+%    		\hline
+%    		Col1 & Col2 & Col2 & Col3 \\ [0.5ex] 
+%    		\hline\hline
+%    		1 & 6 & 87837 & 787 \\ 
+%    		\hline
+%    		2 & 7 & 78 & 5415 \\
+%    		\hline
+%    		3 & 545 & 778 & 7507 \\
+%    		\hline
+%    		4 & 545 & 18744 & 7560 \\
+%    		\hline
+%    		5 & 88 & 788 & 6344 \\ [1ex] 
+%    		\hline
+%    	\end{tabular}
+%    \end{center}
+%    
+%    \begin{longtable}[L]{| p{3cm} | p{2cm} | p{2cm} | p{2cm} | p{2cm}|p{2cm}| } 
+%    	\caption{Specifications of papers.\label{specs}}\\	
+%    	\hline
+%    	\multicolumn{5}{|c|}{Begin of Table}\\
+%    	\hline
+%    	Reference & Type of Data & Problem & Relation Type and Samples & Dataset Name & Comments\\
+%    	\hline
+%    	\endfirsthead
+%    	
+%    	\hline
+%    	\multicolumn{5}{|c|}{Continuation of Table \ref{specs}}\\
+%    	\hline
+%    	Reference & Type of Data & Problem & Relation Type and Samples & Dataset Name & Comments\\
+%    	\hline
+%    	\endhead
+%    	
+%    	\hline
+%    	\endfoot
+%    	
+%    	\hline
+%    	\multicolumn{5}{|c|}{End of Table}\\
+%    	\hline\hline
+%    	\endlastfoot
+%   
+%    		\hline
+%    		Paper A & image, language & visual relationship detection & action: person kick ball & Visual Relationship Dataset: 37,993 relationships &  \\ \hline
+%    		&  &  &  &  &  \\ \hline 	
+%    \end{longtable}
+%
+%	
+% 	\begin{multicols}{2} 
+% 	bla bla bla bla	bla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla blabla bla bla bla \cite{SunFlowLearning2006}
+% 	\end{multicols}
+
+	\pagebreak
+%	\bibliography{Template} 
+%	\bibliographystyle {apalike} % {ieeetr} %{annotate}
+	
+\end{document}
